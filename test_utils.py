@@ -1,3 +1,6 @@
+import os
+import shutil
+
 import numpy as np
 from numpy import testing
 import sympy as sp
@@ -44,19 +47,44 @@ def test_ufuncify_matrix():
 
         return result
 
-    f = utils.ufuncify_matrix((a, b, c), sym_mat)
+    try:
+        tmp_dir = 'created_files'
 
-    result = np.empty((n, 4))
+        f = utils.ufuncify_matrix((a, b, c), sym_mat, tmp_dir=tmp_dir)
+        fnames = ['ufuncify_matrix_0' + suf for suf in ['_c.c', '_h.h',
+                                                        '.pyx',
+                                                        '_setup.py']]
+        for fname in fnames:
+            with open(os.path.join(tmp_dir, fname), 'r') as f1:
+                with open(os.path.join('expected_files', fname), 'r') as f2:
+                    str1 = f1.read()
+                    str2 = f2.read()
+                    assert str1 == str2
 
-    testing.assert_allclose(f(result, a_vals, b_vals, c_vals),
-                            eval_matrix_loop_numpy(a_vals, b_vals, c_vals))
+        result = np.empty((n, 4))
 
-    f = utils.ufuncify_matrix((a, b, c), sym_mat, const=(c,))
+        testing.assert_allclose(f(result, a_vals, b_vals, c_vals),
+                                eval_matrix_loop_numpy(a_vals, b_vals, c_vals))
 
-    result = np.empty((n, 4))
+        f = utils.ufuncify_matrix((a, b, c), sym_mat, const=(c,),
+                                  tmp_dir=tmp_dir)
 
-    testing.assert_allclose(f(result, a_vals, b_vals, c_val),
-                            eval_matrix_loop_numpy(a_vals, b_vals, c_val))
+        fnames = ['ufuncify_matrix_1' + suf for suf in ['_c.c', '_h.h',
+                                                        '.pyx',
+                                                        '_setup.py']]
+        for fname in fnames:
+            with open(os.path.join(tmp_dir, fname), 'r') as f1:
+                with open(os.path.join('expected_files', fname), 'r') as f2:
+                    str1 = f1.read()
+                    str2 = f2.read()
+                    assert str1 == str2
+
+        result = np.empty((n, 4))
+
+        testing.assert_allclose(f(result, a_vals, b_vals, c_val),
+                                eval_matrix_loop_numpy(a_vals, b_vals, c_val))
+    finally:
+        shutil.rmtree(tmp_dir)
 
 
 def test_substitute_matrix():
