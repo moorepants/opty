@@ -2,10 +2,47 @@
 
 import numpy as np
 from scipy.integrate import odeint
+from scipy import linalg
 from opty.direct_collocation import Problem
 from opty.utils import sum_of_sines
 
 from model import PlanarStandingHumanOnMovingPlatform
+
+
+class ControllerDirectIdentifier(object):
+    """This class is able to identify a state feedback controller for a
+    system that tracks the zero vector given estimates of state trajectories
+    and the plant input trajectories."""
+
+    def __init__(self, input_traj, state_traj):
+        """
+
+        Parameters
+        ==========
+        input_traj : array_like, shape(N, m)
+            The N time steps of the m inputs.
+        state_traj : array_like, shape(N, n)
+            The N time steps of the n states.
+
+        """
+        self.input_traj = input_traj
+        self.state_traj = state_traj
+
+    def solve(self):
+        """Returns the least square estimates of the state feedback
+        controller gains."""
+
+        # m x n
+        gains = np.empty((self.input_traj.shape[1],
+                          self.state_traj.shape[1]),
+                         dtype=float)
+
+        for i, regressor in enumerate(self.input_traj.transpose()):
+            res = linalg.lstsq(-self.state_traj, regressor)
+            gains[i] = res[0]
+
+        return gains
+
 
 if __name__ == '__main__':
 
@@ -38,6 +75,10 @@ if __name__ == '__main__':
     print('Integrating equations of motion.')
     x = odeint(rhs, x0, time, args=(args,))
 
+    # N x 4 = ((2 x 4) * (4 x N)).T
+    u = -np.dot(h.numerical_gains, x.T).T
+    u_meas = u + np.random.normal(scale=0.5, size=u.shape)
+
     # Add measurement noise to the data.
     x_meas = x + np.random.normal(scale=np.deg2rad(0.25), size=x.shape)
 
@@ -46,7 +87,7 @@ if __name__ == '__main__':
     print('Setting up optimization problem.')
 
     def obj(free):
-        """Minimize the error in the angle, y1."""
+        """Minimize the error in the states."""
         return interval * np.sum((x_meas_vec - free[:4 * num_nodes])**2)
 
     def obj_grad(free):
@@ -84,3 +125,7 @@ if __name__ == '__main__':
     print("Known value of p = {}".format(h.numerical_gains.flatten()))
     print("Identified value of p = {}".format(h.gain_scale_factors.flatten()
                                               * p_sol))
+
+    idier = ControllerDirectIdentifier(u_meas, x_meas)
+    direct_gains = idier.solve()
+    print("Directly identified value of p = {}".format(direct_gains))
