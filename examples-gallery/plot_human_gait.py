@@ -229,7 +229,7 @@ else:
 solution, info = prob.solve(initial_guess)
 
 xs, rs, _, h_val = prob.parse_free(solution)
-times = np.arange(0.0, num_nodes*h_val, h_val)
+times = np.linspace(0.0, (num_nodes - 1)*h_val, num=num_nodes)
 if info['status'] in (0, 1):
     np.savetxt(f'human_gait_{num_nodes}_nodes_solution.csv', solution,
                fmt='%.3f')
@@ -314,36 +314,16 @@ animation = animate('human-gait-earth.gif')
 # %%
 # Now see what the solution looks like in the Moon's gravitational field.
 g = constants[0]
-par_map[g] = 1.625  # m/s**2
-pprint.pprint(par_map)
+prob.collocator.known_parameter_map[g] = 1.625  # m/s**2
+pprint.pprint(prob.collocator.known_parameter_map)
 
 # %%
-# Use the Earth solution as an initial guess.
-initial_guess = np.loadtxt(fname)
-
-# %%
-# Create an optimization problem and solve it.
-prob = Problem(
-    obj,
-    obj_grad,
-    eom,
-    states,
-    num_nodes,
-    h,
-    known_parameter_map=par_map,
-    known_trajectory_map=traj_map,
-    instance_constraints=instance_constraints,
-    bounds=bounds,
-    time_symbol=time_symbol,
-    parallel=True,
-)
-
-solution, info = prob.solve(initial_guess)
+# Use the Earth solution as an initial guess and solve.
+solution, info = prob.solve(solution)
 
 # %%
 # Animate the second solution.
 xs, rs, _, h_val = prob.parse_free(solution)
-times = np.arange(0.0, num_nodes*h_val, h_val)
 
 animation = animate('human-gait-moon.gif')
 
